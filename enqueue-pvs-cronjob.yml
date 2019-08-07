@@ -1,0 +1,83 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: backup-volumes-cephfs
+  namespace: test-backups
+  annotations:
+    description: Enqueue PV jsons to be processed
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      successfulJobsHistoryLimit: 1
+      failedJobsHistoryLimit: 1
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          serviceAccountName: backup-cephfs-job
+          #initContainers:
+          containers:
+          - image: santos171900/backupcephfs:latest
+            name:  enqueue-volumes-cephfs
+            env:
+            # Get Job ID using Downward API to store this information in env
+            - name: JOB_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            command: [ "/enqueuePVs.sh" ]
+            volumeMounts:
+            - name: jobinfo
+              mountPath: /tmp/etc
+              readOnly: false
+#          restartPolicy: Never
+#          containers:
+          - image: santos171900/backupcephfs:latest
+            name:  backups-volumes-cephfs
+            securityContext:
+              privileged: true
+              runAsUser: 0
+            volumeMounts:
+            - name: jobinfo
+              mountPath: /tmp/etc
+              readOnly: false
+#            env:
+#            # Get Job ID using Downward API to store this information in env
+#            - name: JOB_ID
+#              valueFrom:
+#                fieldRef:
+#                  fieldPath: metadata.uid
+
+
+
+
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                configMapKeyRef:
+                  key: gitlab-shared-s3-access-key
+                  name: gitlab-secrets
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                configMapKeyRef:
+                  key: gitlab-shared-s3-secret-key
+                  name: gitlab-secrets
+            - name: RESTIC_REPOSITORY
+              value: s3:https://s3.cern.ch/swift/v1/paas-cephfs-vol-backup-test-test
+            - name: RESTIC_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  key: restic-backup-password
+                  name: gitlab-secrets
+
+            
+            command: [ "/backupPVs.sh" ]
+          volumes:
+          - name: jobinfo
+            downwardAPI:
+              defaultMode: 420
+              items:
+              - fieldRef:
+                  fieldPath: metadata.labels
+                path: job_labels
+          restartPolicy: Never
