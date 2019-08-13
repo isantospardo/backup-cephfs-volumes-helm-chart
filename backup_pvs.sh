@@ -4,16 +4,16 @@ timestamp() {
   date +%Y-%m-%d_%T
 }
 
-
-
-# Get job UID, using downward API does not work as it does not recongnice the labels
+# Get job UID, downward API does not work as it does not recongnice the labels
 JOB_UID=$(oc get pod/"$(hostname)" -o json | jq '.metadata.name' | tr -d '"')
 echo JOB_UID $JOB_UID
 
+# Iterates over all the items of the queue identified by the job id
 ITEM=$(redis-cli -h redis LPOP job-$JOB_UID-init-complete)
 echo ITEM $ITEM
 while [ -n "$ITEM" ]; do
 
+    # extratcst general information of the json queue elements
     PV_NAME=$(echo "$ITEM" | jq '.metadata.name' | tr -d '"')
 
     NAMESPACE_CSI_DRIVER=paas-infra-cephfs
@@ -28,23 +28,25 @@ while [ -n "$ITEM" ]; do
 
     # on failure: annotate PV beforehand, this makes sure that if the backup fails, the annotations will be set, in any other case the annotations will be removed
     oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-at="$(timestamp)" --overwrite=true
-    
+
 
     oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-by="$(hostname)" --overwrite=true
     # + some human-readable annotations to know which pod did a certain backup for troubleshooting
 
 
     #on backup start: oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-started-at="<some timestamp>" --overwrite=true
-    echo mounting "$PV_NAME" in /data ...
+    echo mounting "$PV_NAME" in /mnt ...
+    echo mount -t ceph "$CEPHFS_MONITORS_PV":"$CEPHFS_ROOTPATH_PV"  -o name="$CEPHFS_USERID",secret="$CEPHFS_USERKEY" /mnt
     mount -t ceph "$CEPHFS_MONITORS_PV":"$CEPHFS_ROOTPATH_PV"  -o name="$CEPHFS_USERID",secret="$CEPHFS_USERKEY" /mnt
 
     # Backup logic
     echo backing up pv "$PV_NAME" ...
 
     #TODO: Add optional tags, be defualt empty, it would be a good idea to add a tag to delete it after a perdiod of time
-    restic backup /data --host=ITEM="$PV_NAME" --cache-dir=/mnt #--tag={{ .name }} --tag=cronjob
+    restic backup /mnt --host=ITEM="$PV_NAME" --cache-dir=/cache --tag=cronjob #--tag={{ .name }}
     # prune old backups if backup was successful
-    #[ $? == 0 ] && restic keep-yearly 3 --keep-monthly 3 --keep-daily 3
+    [ $? == 0 ] && restic keep-yearly 3 --keep-monthly 3 --keep-daily 3
+
     #[ $? == 0 ] && restic forget --host={{ .name }} --cache-dir=/cache --prune --keep-yearly 3 --keep-monthly 3 --keep-daily 3
 
     # TODO: restic cant run in parallel so we have to implement some logic here to forget backups somehow, if this would be possible we could look in a init container to have it created and before any other job started.
@@ -62,11 +64,11 @@ while [ -n "$ITEM" ]; do
 
 
     echo annotating and labeling PV "$NAME_PV" ...
-    oc annotate pv/"$NAME_PV" backup-cephfs-volumes.cern.ch/backup="pv-being-backedup-by-job-$JOB_ID" --overwrite=true
-    oc label pv "$NAME_PV" backup_status=succeded --overwrite=true
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup="pv-being-backedup-by-job-$JOB_ID" --overwrite=true
+    oc label pv "$PV_NAME" backup_status=succeded --overwrite=true
 
     # unmount pv from /data earlier mounted
-    echo unmounting "$NAME_PV" from /data ...
+    echo unmounting "$PV_NAME" from /data ...
     umount /mnt
 
     # next item

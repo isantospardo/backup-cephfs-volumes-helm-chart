@@ -3,7 +3,7 @@ kind: SecurityContextConstraints
 metadata:
   annotations:
     kubernetes.io/description: 'grant all privileges to the Cephfs CSI driver and Manila volume provisioner.'
-  name: test
+  name: backup-cephfs-job-scc
 allowHostDirVolumePlugin: true
 allowHostIPC: true
 allowHostNetwork: true
@@ -34,6 +34,6 @@ seccompProfiles:
 supplementalGroups:
   type: RunAsAny
 users:
-- system:serviceaccount:test-backups:backup-cephfs-controller
+- system:serviceaccount:test-backups:backup-cephfs-job
 volumes:
 - '*'

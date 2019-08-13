@@ -4,7 +4,6 @@ metadata:
   name: backup-cephfs-job
   namespace: test-backups
 
-
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -16,13 +15,12 @@ subjects:
     namespace: test-backups
 roleRef:
   kind: ClusterRole
-  # use csi-external-attacher to user the possibility of patching pvs when annotating them
+  # Use csi-external-attacher to patch pvs when annotating them
   name: system:csi-external-attacher
   apiGroup: rbac.authorization.k8s.io
 
-
 ---
-# It needs to read the secrets of the namespace od the drived
+# It needs to read the secrets of the namespace od the driver
 apiVersion: rbac.authorization.k8s.io/v1
 # TODO: Cange to Role
 kind: ClusterRole
@@ -32,7 +30,6 @@ rules:
 - apiGroups: [""]
   resources: ["secrets", "pods"]
   verbs: ["get", "list"]
-
 
 ---
 # manila provisioner needs to manage secrets and endpoints in its namespace
@@ -47,5 +44,6 @@ subjects:
     namespace: test-backups
 roleRef:
   apiGroup: rbac.authorization.k8s.io
+  # TODO: Change to Role
   kind: ClusterRole
   name: secret-reader

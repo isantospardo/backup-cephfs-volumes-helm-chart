@@ -16,8 +16,7 @@ spec:
       template:
         spec:
           serviceAccountName: backup-cephfs-job
-          #initContainers:
-          containers:
+          initContainers:
           - image: santos171900/backupcephfs:latest
             name:  enqueue-volumes-cephfs
             env:
@@ -26,13 +25,13 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.uid
-            command: [ "/enqueuePVs.sh" ]
+            command: [ "/enqueue_pvs.sh" ]
             volumeMounts:
             - name: jobinfo
               mountPath: /tmp/etc
               readOnly: false
-#          restartPolicy: Never
-#          containers:
+          restartPolicy: Never
+          containers:
           - image: santos171900/backupcephfs:latest
             name:  backups-volumes-cephfs
             securityContext:
@@ -42,36 +41,29 @@ spec:
             - name: jobinfo
               mountPath: /tmp/etc
               readOnly: false
-#            env:
-#            # Get Job ID using Downward API to store this information in env
-#            - name: JOB_ID
-#              valueFrom:
-#                fieldRef:
-#                  fieldPath: metadata.uid
-
-
-
-
+            env:
+            # env variables we need for restic
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
-                configMapKeyRef:
-                  key: gitlab-shared-s3-access-key
-                  name: gitlab-secrets
+                secretKeyRef:
+                  key: cephfs-backup-s3-access-key
+                  name: cephfs-backup-secrets
             - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
-                configMapKeyRef:
-                  key: gitlab-shared-s3-secret-key
-                  name: gitlab-secrets
+                secretKeyRef:
+                  key: cephfs-backup-s3-secret-key
+                  name: cephfs-backup-secrets
             - name: RESTIC_REPOSITORY
-              value: s3:https://s3.cern.ch/swift/v1/paas-cephfs-vol-backup-test-test
+              valueFrom:
+                secretKeyRef:
+                  key: cephfs-backup-registry-repository
+                  name: cephfs-backup-secrets
             - name: RESTIC_PASSWORD
               valueFrom:
-                configMapKeyRef:
-                  key: restic-backup-password
-                  name: gitlab-secrets
-
-            
-            command: [ "/backupPVs.sh" ]
+                secretKeyRef:
+                  key: cephfs-backup-password
+                  name: cephfs-backup-secrets
+            command: [ "/backup_pvs.sh" ]
           volumes:
           - name: jobinfo
             downwardAPI:
