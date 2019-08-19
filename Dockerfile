@@ -3,6 +3,7 @@ FROM gitlab-registry.cern.ch/paas-tools/openshift-client
 COPY ./worker.py ./rediswq.py ./enqueue_pvs.sh ./backup_pvs.sh /
 
 RUN yum install epel-release -y && \
+    yum clean all && \
     # install redis
     yum install redis -y && \
     # install restic
