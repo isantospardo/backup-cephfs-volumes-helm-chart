@@ -45,7 +45,9 @@ while [ -n "$ITEM" ]; do
     restic backup /mnt --host="$PV_NAME" --cache-dir=/cache --tag=cronjob --tag="$PV_NAME"
     # removes snapshots, a prune command will run once a week to remove the data that was referencing the snapshot from the repository
     # TODO: parametrize values
-    [ $? == 0 ] && restic forget --host="$PV_NAME" --cache-dir=/cache --keep-yearly 3 --keep-monthly 3 --keep-daily 3
+#    [ $? == 0 ] && restic forget --host="$PV_NAME" --cache-dir=/cache --keep-yearly 3 --keep-monthly 3 --keep-daily 3
+    [ $? == 0 ] && restic forget --host="$PV_NAME" --cache-dir=/cache "$restic_forget_args"
+
     echo "$PV_NAME" backed up
     # TODO: restic cant run in parallel so we have to implement some logic here to forget backups somehow, 
     # if this would be possible we could look in a init container to have it created and before any other job started.
