@@ -29,6 +29,6 @@ The namespace used to be deployed is by default `paas-infra-backups`, in all the
 
 We just need to create the `redis` pod and service to store the PV json elements in the queue.
 ```
-oc create -f redis-pod.yaml -n paas-infra-backups
+oc create -f redis-deployment.yaml -n paas-infra-backups
 oc create -f redis-service.yaml -n paas-infra-backups
 ```

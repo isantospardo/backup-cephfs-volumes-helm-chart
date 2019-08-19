@@ -43,10 +43,10 @@ while [ -n "$ITEM" ]; do
     echo backing up PV "$PV_NAME" JOB_ID: "$JOB_UID" ...
     #TODO: Add optional tags, be default empty, it would be a good idea to add a tag to delete it after a period of time
     restic backup /mnt --host="$PV_NAME" --cache-dir=/cache --tag=cronjob --tag="$PV_NAME"
+
     # removes snapshots, a prune command will run once a week to remove the data that was referencing the snapshot from the repository
-    # TODO: parametrize values
-#    [ $? == 0 ] && restic forget --host="$PV_NAME" --cache-dir=/cache --keep-yearly 3 --keep-monthly 3 --keep-daily 3
-    [ $? == 0 ] && restic forget --host="$PV_NAME" --cache-dir=/cache "$restic_forget_args"
+    restic unlock
+    [ $? == 0 ] && restic forget --host="$PV_NAME" --cache-dir=/cache ${restic_forget_args}
 
     echo "$PV_NAME" backed up
     # TODO: restic cant run in parallel so we have to implement some logic here to forget backups somehow, 
@@ -73,4 +73,4 @@ while [ -n "$ITEM" ]; do
 done
 
 # Remove all keys in redis database to start from scratch next time
-redis-cli -h redis FLUSHDB
+#redis-cli -h redis FLUSHDB

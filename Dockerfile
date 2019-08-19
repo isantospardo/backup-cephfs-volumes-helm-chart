@@ -10,7 +10,5 @@ RUN yum install epel-release -y && \
     yum copr enable copart/restic -y && \
     yum install restic -y && \
     yum clean all
-    #chmod +x /*.sh && \
-    #chmod +x /*.py
 
 CMD python worker.py
