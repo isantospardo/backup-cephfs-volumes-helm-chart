@@ -27,8 +27,12 @@ To do this, we need to set several things:
 This backup solution for CephFS volumes is deployed with `helm` as a subchart of [CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment).
 The namespace used to be deployed is by default `paas-infra-backups`, in all the clusters.
 
-We just need to create the `redis` pod and service to store the PV json elements in the queue.
+We just need to create the `redis` pod, service and configmap to store the PV json elements in the queue.
+A configmap is needed because we need to set up the `redis` configuration.
+We just need to trust the data in cache as the data stored is going to be filed out once a day.
+
 ```
 oc create -f redis-deployment.yaml -n paas-infra-backups
 oc create -f redis-service.yaml -n paas-infra-backups
+oc create -f redis-configmap.yaml -n paas-infra-backups
 ```

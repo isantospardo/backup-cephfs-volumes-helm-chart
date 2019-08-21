@@ -27,5 +27,15 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "500m"
+          # We need this to run redis with the specific redis configuration file from a configmap
+          command: ["redis-server", "/data/redis.conf"]
           ports:
             - containerPort: 6379
+          volumeMounts:
+            - name: redis-configuration
+              mountPath: /data
+      volumes:
+        - name: redis-configuration
+          configMap:
+            name: redis-config
+            defaultMode: 0755
