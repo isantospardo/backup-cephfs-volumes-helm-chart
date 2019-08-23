@@ -8,7 +8,7 @@ timestamp() {
 # In case of failure, the job will exit.
 set -e
 restic check
-[ $? -ne 0 ] && echo ERROR when checking restic data, it seems the data is not properly stored in the repository
+[ $? -ne 0 ] && echo "ERROR when checking restic data, it seems the data is not properly stored in the repository"
 set +e
 
 # Get job UID. We need to do it on this way as downward API does not work as it does not recognize the labels.
@@ -22,7 +22,7 @@ while [ -n "$ITEM" ]; do
     # This is needed to mount the PVs into the pods to do the backup.
     PV_NAME=$(echo "$ITEM" | jq '.metadata.name' | tr -d '"')
 
-    NAMESPACE_CSI_DRIVER=paas-infra-cephfs
+    NAMESPACE_CSI_DRIVER=$(echo $ITEM | jq '.spec.csi.nodeStageSecretRef.namespace'| tr -d '"')
     CEPHFS_MONITORS_PV=$(echo $ITEM | jq '.spec.csi.volumeAttributes.monitors'| tr -d '"')
     CEPHFS_ROOTPATH_PV=$(echo $ITEM | jq '.spec.csi.volumeAttributes.rootPath' | tr -d '"')
     CEPHFS_SECRET_REF=$(echo $ITEM | jq '.spec.csi.nodeStageSecretRef.name' | tr -d '"')
@@ -33,14 +33,14 @@ while [ -n "$ITEM" ]; do
     set -e
 
     # Annotates PV failure beforehand, this makes sure that if the backup fails, the annotations will still be set.
-    # In any other case the annotations will be removed.
+    # In any other case the annotations will be removed later on.
     oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-at="$(timestamp)" --overwrite=true
     oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-by="$(hostname)" --overwrite=true
   
-    echo mounting "$PV_NAME" in /mnt JOB_ID: "$JOB_UID" ...
+    echo mounting "$PV_NAME" in /mnt JOB_UID: "$JOB_UID" ...
     mount -t ceph "$CEPHFS_MONITORS_PV":"$CEPHFS_ROOTPATH_PV"  -o name="$CEPHFS_USERID",secret="$CEPHFS_USERKEY" /mnt
 
-    echo backing up PV "$PV_NAME" JOB_ID: "$JOB_UID" ...
+    echo backing up PV "$PV_NAME" JOB_UID: "$JOB_UID" ...
     #TODO: Add optional tags, be default empty, it would be a good idea to add a tag to delete it after a period of time
     restic backup /mnt --host="$PV_NAME" --cache-dir=/cache --tag=cronjob --tag="$PV_NAME"
 
@@ -55,22 +55,21 @@ while [ -n "$ITEM" ]; do
 
     # On success: it deletes the failure annotations earlier set
     # It annotates the success of the backup into the PV
-    echo annotating and labeling PV "$NAME_PV" JOB_ID: "$JOB_UID" ...
+    echo annotating and labeling PV "$NAME_PV" JOB_UID: "$JOB_UID" ...
     oc annotate pv "$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-at-
     oc annotate pv "$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-by-
-    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-at="echo $(timestamp)" --overwrite=true
+    oc annotate pv "$PV_NAME" backup-cephfs-volumes.cern.ch/backup-queued-at-
+    oc annotate pv "$PV_NAME" backup-cephfs-volumes.cern.ch/backup-queued-by-
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-at="$(timestamp)" --overwrite=true
     oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-by="$(hostname)" --overwrite=true
 
-    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup="pv-being-backedup-by-job-$JOB_ID" --overwrite=true
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup="pv-backedup-by-job-$JOB_UID" --overwrite=true
     oc label pv "$PV_NAME" backup_status=succeded --overwrite=true
 
     # Unmount pv from /mnt earlier mounted
-    echo unmounting "$PV_NAME" from /mnt JOB_ID: "$JOB_UID"  ...
+    echo unmounting "$PV_NAME" from /mnt JOB_UID: "$JOB_UID"  ...
     umount /mnt
 
     # Process next item 
     ITEM=$(redis-cli -h redis LPOP job-$JOB_UID-init-complete)
 done
-
-# Remove all keys in redis database to start from scratch next time
-#redis-cli -h redis FLUSHDB

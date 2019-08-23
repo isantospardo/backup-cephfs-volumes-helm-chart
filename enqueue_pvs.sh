@@ -13,18 +13,18 @@ if [ $setnx_rv -eq 0 ]; then
     JOB_UID=$(oc get pod/"$(hostname)" -o json | jq '.metadata.name' | tr -d '"')
 
     oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -c '.items | .[]' | while IFS= read -r PV_JSON; do
-        # Enqueue the json of the PV in redis queue, it uses the id of the job, so every queue will a different repo.
+        # Enqueue the json of the PV in redis queue, it uses the uid of the job, so each of the queues will a different repo.
         redis-cli -h redis rpush job-$JOB_UID-init-complete "$PV_JSON"
 
         PV_NAME=$(echo "$PV_JSON" | jq '.metadata.name' | tr -d '"')
 
         # It needs to have --overwrite due to the possibility of having the annotation already there
-        oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup="pv-ready-to-be-backedup-by-job-$JOB_ID" --overwrite=true
+        oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup="pv-ready-to-be-backedup-by-job-$JOB_UID" --overwrite=true
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-queued-at="$(timestamp)" --overwrite=true
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-queued-by="$(hostname)" --overwrite=true
 
-        # TODO: prometheus, check if a PV was annotated as queued at <today> and the amount of annotations with back-up failure at is <today> is more than 10% of them
-        # TODO: prometheus, check if the PV it has the label to be backed up and dont have a back-up success at for three days.
+        # TODO: prometheus exporter metrics, check if a PV was annotated as queued at <today> and the amount of annotations with back-up failure at is <today> is more than 10% of them
+        # TODO: prometheus exporter metrics, check if the PV it has the label to be backed up and dont have a back-up success at for three days.
     done
     redis-cli --raw -h redis SETNX job-$JOB_UID-init-complete "$(hostname)"
 else
