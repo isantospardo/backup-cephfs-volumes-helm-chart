@@ -2,20 +2,21 @@
 
 We need to backup CephFS persistent volumes. By default we do not have any automatically backup solution.
 
-This [backup solution](https://gitlab.cern.ch/paas-tools/storage/backup-cephfs-volumes) backs up the CephFS persistent volumes filtering the volumes with label `backup-cephfs-volumes.cern.ch/backup=true`.
+This [backup solution](https://gitlab.cern.ch/paas-tools/storage/backup-cephfs-volumes) backs up the CephFS persistent volumes.
+The way it works is filtering the volumes with label `backup-cephfs-volumes.cern.ch/backup=true`.
 When a PV has this label specified, a `redis` queue is filled out with all the `json` information about the PV.
-Once this process success, we process the elements of the queue  by a job. This job creates a pod per each PV `json` and mount the PV into the pod.
+Once this process success, we process the elements of the queue with a job. This job creates a pod per each PV `json` and mount the PV into the pod.
 When the PV is mounted into the pod, the backup solution (which use [`restic`](https://restic.net/) under the hood) starts to back up each PV.
 
-Once this PV is backed up, we add some annotations into the PV to check wether it succeeded or it failed to back up the PV.
-We also created some alarms in prometheus to check if the PVs are not backed up for a long time. This makes sure everything works as expected.
+Once this PV is backed up, we add some annotations into the PV to check whether it succeeded or it failed to back up the PV.
+# TODO: We also created some alarms in prometheus to check if the PVs are not backed up for a long time. This makes sure everything works as expected.
 
-To do this, we need to set several things:
+Brief summary:
 
-- The back ups are backed up in S3
+- The back ups are backed up using S3
 - The persistent volumes are going to be backed up once a day
-- We remove the PVs in ... 
-- We prune the PVs in ...
+# TODO: - We remove the PVs in ...
+# TODO: - We prune the PVs in ...
 
 ## ServiceAccounts
 

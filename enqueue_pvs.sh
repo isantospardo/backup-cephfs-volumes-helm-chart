@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 timestamp() {
-  date +%Y-%m-%d_%T
+  date +%Y-%m-%dT%H:%M:%S.%3NZ
 }
 
 # Only one pod will be the first to set the init key and get a return value of 1
