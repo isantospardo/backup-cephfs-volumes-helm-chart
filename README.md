@@ -15,11 +15,7 @@ Brief summary:
 
 - The back ups are backed up using S3
 - The persistent volumes are going to be backed up once a day
-<<<<<<< HEAD
 # TODO: - We remove the PVs in ...
-=======
-# TODO: - We remove the PVs in ... 
->>>>>>> Fix doc and timestamps
 # TODO: - We prune the PVs in ...
 
 ## ServiceAccounts
