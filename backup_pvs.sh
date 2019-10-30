@@ -8,12 +8,6 @@ timestamp() {
 # as all the operations are critical.
 set -e
 
-# Run restic check to verify that all data is properly stored in the repo.
-if ! restic check; then
-  echo "ERROR when checking restic data, it seems the data is not properly stored in the repository"
-  exit 1
-fi
-
 # Get job UID. We need to do it on this way as downward API does not work as it does not recognize the labels.
 JOB_UID=$(oc get pod/"$(hostname)" -o json | jq -r '.metadata.name')
 

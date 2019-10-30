@@ -4,9 +4,14 @@ timestamp() {
   date +%Y-%m-%dT%H:%M:%S.%3NZ
 }
 
+# Will stop the execution of the forget backup script if it finds any command execution error
+set -e
+
 # Run restic check to verify that all data is properly stored in the repo.
-restic check
-[ $? -ne 0 ] && echo "ERROR when checking restic data, it seems the data is not properly stored in the repository" && exit 1
+if ! restic check; then
+  echo "ERROR when checking restic data, it seems the data is not properly stored in the repository"
+  exit 1
+fi
 
 # remove any stale lock (e.g. failed backups)
 restic unlock
