@@ -7,14 +7,14 @@ timestamp() {
 # Will stop the execution of the forget backup script if it finds any command execution error
 set -e
 
+# remove any stale lock (e.g. failed backups)
+restic unlock
+
 # Run restic check to verify that all data is properly stored in the repo.
 if ! restic check; then
   echo "ERROR when checking restic data, it seems the data is not properly stored in the repository"
   exit 1
 fi
-
-# remove any stale lock (e.g. failed backups)
-restic unlock
 
 # forget and prune old backups
 # Both forget and prune need the exclusive lock on the whole restic repo in S3 (cannot run concurrently with backups)
