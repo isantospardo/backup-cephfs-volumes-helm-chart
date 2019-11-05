@@ -3,18 +3,19 @@
 timestamp() {
   date +%Y-%m-%dT%H:%M:%S.%3NZ
 }
+# Get job name uid through the downward API. This value is store in the labels of the pod just created by the job.
+# It is required to run parallel pods in the job and be able to do simultaneously backups in parallel of different PVs.
+JOB_UID=$(cat /etc/jobinfo/labels | grep 'job-name' | cut -d'=' -f2 |  tr -d '"')
 
 # Only one pod will be the first to set the init key and get a return value of 1
 setnx_rv=$(redis-cli --raw -h redis SETNX job-$JOB_UID-init-complete "$(hostname)")
 
 if [ $setnx_rv -eq 0 ]; then
     # I'm the first, initialize the queue and set the init-complete key
-    # Get job UID, downward API does not work as it does not recognize the labels when creating the pod
-    JOB_UID=$(oc get pod/"$(hostname)" -o json | jq -r '.metadata.name')
 
     oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -c '.items | .[]' | while IFS= read -r PV_JSON; do
         # Enqueue the json of the PV in redis queue, it uses the uid of the job, so each of the queues will a different repo.
-        redis-cli -h redis rpush job-$JOB_UID-init-complete "$PV_JSON"
+        redis-cli -h redis rpush job-$JOB_UID-queue "$PV_JSON"
 
         PV_NAME=$(echo "$PV_JSON" | jq -r '.metadata.name')
 

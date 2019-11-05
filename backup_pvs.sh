@@ -8,12 +8,13 @@ timestamp() {
 # as all the operations are critical.
 set -e
 
-# Get job UID. We need to do it on this way as downward API does not work as it does not recognize the labels.
-JOB_UID=$(oc get pod/"$(hostname)" -o json | jq -r '.metadata.name')
+# Get job name uid through the downward API. This value is store in the labels of the pod just created by the job.
+# It is required to run parallel pods in the job and be able to do simultaneously backups in parallel of different PVs.
+JOB_UID=$(cat /etc/jobinfo/labels | grep 'job-name' | cut -d'=' -f2 |  tr -d '"')
 
 # Iterates over all the items of the repo queue identified by the job id.
 while true; do
-  ITEM=$(redis-cli -h redis LPOP job-$JOB_UID-init-complete)
+  ITEM=$(redis-cli -h redis LPOP job-$JOB_UID-queue)
   if [ -z "$ITEM" ]; then
     echo "No more PV to process"
     exit 0
