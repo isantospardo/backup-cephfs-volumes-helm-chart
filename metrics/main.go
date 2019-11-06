@@ -2,43 +2,51 @@ package main
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
 
 const (
-	// PV annotations set when backups fails
+	// annotations specified in the pv about the failure or success of the backup
 	annotationBackupFailureAt = "backup-cephfs-volumes.cern.ch/backup-failure-at"
-	backupFailure             = "backup_failed"
 	annotationBackupSuccessAt = "backup-cephfs-volumes.cern.ch/backup-success-at"
-	backupSucces              = "backup_succeded"
+
+	backupFailure = "backup_failed"
+	backupSucces  = "backup_succeeded"
 )
 
 var (
-	annotationBackupFailureAtVar string
-	annotationBackupSuccessAtVar string
 
 	// Add specific labels to the metric
 	statusReclaimVolumes = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "cephfs_volume_last_backup_failure_time",
+		Name: "cephfs_volume_last_backup_time",
 		Help: "Status reclaim cephfs volumes",
 	}, []string{"persistentvolume", "event"})
 )
 
-func getStatusReclaimVolumes() {
+// Set value and labels to show in the metric,
+func seValueAndLabelMetrics(persV v1.PersistentVolume, backupStatus string, t time.Time) {
 
-	// Get global kubeclient
-	clientset := kubeclient.kubeclient
+	// To store the values in prometheus it has to be in float64
+	statusReclaimVolumes.WithLabelValues(persV.Name, backupFailure).Set(float64(t.Unix()))
+
+}
+
+func getAnnotationPV(persV v1.PersistentVolume, annotationBackupStatus string) string {
+	return persV.ObjectMeta.Annotations[annotationBackupStatus]
+}
+
+func getStatusReclaimVolumes() {
 
 	go func() {
 		for {
-			// List all persistent volumes
-			pvList, err := clientset.CoreV1().PersistentVolumes().List(meta_v1.ListOptions{})
+			// List *all* persistent volumes
+			pvList, err := kubeclient.kubeclient.CoreV1().PersistentVolumes().List(meta_v1.ListOptions{})
 			if err != nil {
 				klog.Fatalf("ERROR: Impossible to retrieve the list of all persistent volumes %s ", err)
 			}
@@ -48,27 +56,19 @@ func getStatusReclaimVolumes() {
 				// Check whether the annotation of the PV to backup is success or failure
 				// In case the annotation exists, we add the value into the metrics exporter
 				if _, ok := persV.ObjectMeta.Annotations[annotationBackupFailureAt]; ok {
-					annotationBackupFailureAtVar = persV.ObjectMeta.Annotations[annotationBackupFailureAt]
 
-					// Parse time to ms
-					layout := "2006-01-02T15:04:05Z"
-					t, _ := time.Parse(layout, annotationBackupFailureAtVar)
-					annotationBackupFailureAtVar = strconv.FormatInt(t.Unix()*1000, 10)
+					annotationBackupFailureAtVar := getAnnotationPV(persV, annotationBackupFailureAt)
 
-					// Set value and labels to the show in the metric, the value has to be in float64
-					statusReclaimVolumes.WithLabelValues(persV.Name, backupFailure).Set(float64(t.Unix()))
+					t, _ := time.Parse(time.RFC3339, annotationBackupFailureAtVar)
+					seValueAndLabelMetrics(persV, backupFailure, t)
 				}
 
 				if _, ok := persV.ObjectMeta.Annotations[annotationBackupSuccessAt]; ok {
-					annotationBackupSuccessAtVar = persV.ObjectMeta.Annotations[annotationBackupSuccessAt]
 
-					// Parse time to ms
-					layout := "2006-01-02T15:04:05Z"
-					t, _ := time.Parse(layout, annotationBackupSuccessAtVar)
-					annotationBackupSuccessAtVar = strconv.FormatInt(t.Unix()*1000, 10)
+					annotationBackupSuccessAtVar := getAnnotationPV(persV, annotationBackupSuccessAt)
 
-					// Set value and labels to the show in the metric, the value has to be in float64
-					statusReclaimVolumes.WithLabelValues(persV.Name, backupSucces).Set(float64(t.Unix()))
+					t, _ := time.Parse(time.RFC3339, annotationBackupSuccessAtVar)
+					seValueAndLabelMetrics(persV, backupSucces, t)
 				}
 			}
 		}
