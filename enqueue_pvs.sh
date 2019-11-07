@@ -19,8 +19,9 @@ if [ $setnx_rv -eq 1 ]; then
 
         PV_NAME=$(echo "$PV_JSON" | jq -r '.metadata.name')
 
+        echo "Adding PV ${PV_NAME} to backup queue"
+
         # It needs to have --overwrite due to the possibility of having the annotation already there
-        oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup="pv-ready-to-be-backedup-by-job-$JOB_UID" --overwrite=true
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-queued-at="$(timestamp)" --overwrite=true
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-queued-by="$(hostname)" --overwrite=true
     done
