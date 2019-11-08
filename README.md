@@ -39,8 +39,8 @@ Once we build the images, we have two scenarios:
 
 1. We want to test the images first:
    In this case wee need to go to [CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment),
-   and follow the `Testing components with different images` procedure documented in there.
+   and follow the `Testing changes in a component's Docker image` procedure documented in there.
 
 2. We want to deploy a new stable image in our three clusters `Prod`, `Staging` and `Playground`:
    We need to go to [CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment),
-   and open a new MR against master with the new image tag.
+   and open a new MR against master with the new `RELEASE` tag automatically created by the `.gitlab-ci`
