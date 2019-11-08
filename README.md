@@ -32,3 +32,15 @@ Brief summary:
 
 This backup solution for CephFS volumes is deployed with `helm` as a subchart of [CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment).
 The namespace used to be deployed is by default `paas-infra-cephfs`, in all the clusters.
+
+### Tag images in the helm deployment
+
+Once we build the images, we have two scenarios:
+
+1. We want to test the images first:
+   In this case wee need to go to [CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment),
+   and follow the `Testing components with different images` procedure documented in there.
+
+2. We want to deploy a new stable image in our three clusters `Prod`, `Staging` and `Playground`:
+   We need to go to [CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment),
+   and open a new MR against master with the new image tag.
