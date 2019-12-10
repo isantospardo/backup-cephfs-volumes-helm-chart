@@ -15,13 +15,17 @@ Then all the backups pods work in parallel in their main container. One by one, 
 the pod backs up the PV using [`restic`](https://restic.net/). Then it unmounts it and moves on to the next PV.
 
 Once this PV is backed up, we add some annotations into the PV to indicate whether it succeeded or it failed to back up the PV.
+Also, the [prometheus](https://gitlab.cern.ch/paas-tools/monitoring/prometheus-openshift) main instance scrapes the PVs backed up.
+We send metrics to Prometheus once the PVs are successfully backed up thanks to the
+[prometheus pushgateway](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment/tree/master/chart/charts/cephfs-backup-pvs/templates).
 
 Brief summary:
 
 - The PVs are backed up using S3
 - The persistent volumes are going to be backed up once a day
 - The back ups are going to be pruned once a week, following the resticForgetArgs specified in the values of
-[CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment).
+[CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment)
+- We send metrics to the main [prometheus](https://gitlab.cern.ch/paas-tools/monitoring/prometheus-openshift) instance
 
 ## ServiceAccounts
 

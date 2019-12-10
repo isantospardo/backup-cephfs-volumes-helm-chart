@@ -51,6 +51,12 @@ while true; do
       oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-at="$(timestamp)" --overwrite=true
       oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-by="$(hostname)" --overwrite=true
 
+      # Push metrics into the prometheus group identified by cephfs_volume_last_backup{job="hostname",instance="pv_name", status="backup_succeeded"} date +%s
+      cat <<EOF | curl --data-binary @- ${pushgateway_service}.svc:9091/metrics/job/$(hostname)/instance/"$PV_NAME"/status/"backup_succeeded"
+          # TYPE cephfs_volume_last_backup gauge
+          # HELP cephfs_volume_last_backup job="hostname" instance="pv_name"  status="backup_succeeded"
+          cephfs_volume_last_backup $(date '+%s.%N' | sed 's/N$//')
+EOF
       # Unmount pv from /mnt earlier mounted
       echo unmounting "$PV_NAME" from /mnt JOB_UID: "$JOB_UID"  ...
       umount /mnt
