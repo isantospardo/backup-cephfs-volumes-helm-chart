@@ -16,6 +16,22 @@ if ! restic check; then
   exit 1
 fi
 
+# delete all restic snapshots with --tag to-delete
+restic forget --tag to-delete --keep-last 1
+
+# get all the host names of the snapshots
+restic_snapshot_host_list=$(restic snapshots | awk '{print $4}')
+
+oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -c '.items | .[]' | while IFS= read -r PV_JSON; do
+  PV_NAME=$(echo "$PV_JSON" | jq -r '.metadata.name')
+
+  echo "$restic_snapshot_host_list" | grep -q "$PV_NAME"
+  if [[ $? -ne 0 ] ; then
+      # tag all the snapshots owned by the deleted pv to forget them during next run
+      restic tag --set to-delete  $(restic snapshots | grep  $PV_NAME | awk '{print $1}')
+  fi
+done
+
 # forget and prune old backups
 # Both forget and prune need the exclusive lock on the whole restic repo in S3 (cannot run concurrently with backups)
 # so we do both operations together
