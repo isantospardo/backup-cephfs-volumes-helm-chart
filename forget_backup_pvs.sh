@@ -16,21 +16,23 @@ if ! restic check; then
   exit 1
 fi
 
-# delete all restic snapshots with --tag to-delete
+# delete all but one restic snapshots with --tag to-delete
+# it will keep the last restic snapshot for safeguard, then the following run will remove the last backup
+# https://restic.readthedocs.io/en/latest/060_forget.html#removing-snapshots-according-to-a-policy
 restic forget --tag to-delete --keep-last 1
 
-# get all the host names of the snapshots
-restic_snapshot_host_list=$(restic snapshots | awk '{print $4}')
+restic_snapshot_host_list=$(restic snapshots --json | jq -r .'[] | .hostname')
 
 # once a PV is not marked for backup anymore (label value changed, PV deleted...),
 # mark any snapshot for that PV for deletion.
-oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -c '.items | .[]' | while IFS= read -r PV_JSON; do
-  PV_NAME=$(echo "$PV_JSON" | jq -r '.metadata.name')
+pv_list=$(oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -c '.items | .[]' | jq -r '.metadata.name')
 
-  echo "$restic_snapshot_host_list" | grep -q "$PV_NAME"
-  if [[ $? -ne 0 ] ; then
+for restic_snapshot_host in "$restic_snapshot_host_list"
+do
+  echo "$pv_list" | grep -q "$restic_snapshot_host"
+  if [[ $? -ne 0 ]] ; then
       # tag all the snapshots owned by the deleted pv to forget them during next run
-      restic tag --set to-delete  $(restic snapshots | grep  $PV_NAME | awk '{print $1}')
+      restic tag --set to-delete  $(restic snapshots --json | jq -r .'[] | select(.hostname=="$restic_snapshot_host") | .short_id')
   fi
 done
 
