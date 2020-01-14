@@ -22,6 +22,8 @@ restic forget --tag to-delete --keep-last 1
 # get all the host names of the snapshots
 restic_snapshot_host_list=$(restic snapshots | awk '{print $4}')
 
+# once a PV is not marked for backup anymore (label value changed, PV deleted...),
+# mark any snapshot for that PV for deletion.
 oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -c '.items | .[]' | while IFS= read -r PV_JSON; do
   PV_NAME=$(echo "$PV_JSON" | jq -r '.metadata.name')
 
