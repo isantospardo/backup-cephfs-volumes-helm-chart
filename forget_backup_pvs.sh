@@ -16,23 +16,33 @@ if ! restic check; then
   exit 1
 fi
 
-# delete all but one restic snapshots with --tag to-delete
-# it will keep the last restic snapshot for safeguard, then the following run will remove the last backup
+# we run a removal of the backups when the main PV is deleted. It deletes all but one restic snapshots with --tag to-delete
+# it will keep the last restic snapshot for safeguard
 # https://restic.readthedocs.io/en/latest/060_forget.html#removing-snapshots-according-to-a-policy
 restic forget --tag to-delete --keep-last 1
 
-restic_snapshot_host_list=$(restic snapshots --json | jq -r .'[] | .hostname')
+# we need to retrieve the hostname from the snapshots where the name of the PV is stored
+restic_snapshot_hostname_list=$(restic snapshots --json | jq -r ' .[] | .hostname' | sort -u)
+
+# it stores the pv_names in a hash table to make it easier to check if the PV exists to delete the backups
+declare -A pv_list
+# disables monitor mode as it separates the SubShell and we need access to the hash we are loading
+set +m
+shopt -s lastpipe
+oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -r '.items[].metadata.name' | while IFS= read -r pv_name; do
+  echo "$pv_name"
+  pv_list["$pv_name"]="0"
+  echo ${pv_list[$pv_name]}
+done
 
 # once a PV is not marked for backup anymore (label value changed, PV deleted...),
 # mark any snapshot for that PV for deletion.
-pv_list=$(oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -c '.items | .[]' | jq -r '.metadata.name')
-
-for restic_snapshot_host in "$restic_snapshot_host_list"
-do
-  echo "$pv_list" | grep -q "$restic_snapshot_host"
-  if [[ $? -ne 0 ]] ; then
-      # tag all the snapshots owned by the deleted pv to forget them during next run
-      restic tag --set to-delete  $(restic snapshots --json | jq -r .'[] | select(.hostname=="$restic_snapshot_host") | .short_id')
+for restic_snapshot_host in $restic_snapshot_hostname_list; do
+  echo $restic_snapshot_host
+  echo restic_snapshot ${pv_list[$restic_snapshot_host]}
+  if [[ ! ${pv_list[$restic_snapshot_host]} ]]; then
+    # tag all the snapshots owned by the deleted PV to forget them during next run
+    restic tag --set to-delete --host "$restic_snapshot_host"
   fi
 done
 
