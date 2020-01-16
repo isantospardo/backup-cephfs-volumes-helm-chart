@@ -24,23 +24,19 @@ restic forget --tag to-delete --keep-last 1
 # we need to retrieve the hostname from the snapshots where the name of the PV is stored
 restic_snapshot_hostname_list=$(restic snapshots --json | jq -r ' .[] | .hostname' | sort -u)
 
-# it stores the pv_names in a hash table to make it easier to check if the PV exists to delete the backups
+# it stores the pv_names in a hash table to make it easier to check if the PV exists in order to delete the unnecessary backups
 declare -A pv_list
 # disables monitor mode as it separates the SubShell and we need access to the hash we are loading
 set +m
 shopt -s lastpipe
 oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -r '.items[].metadata.name' | while IFS= read -r pv_name; do
   pv_list["$pv_name"]="0"
-  #echo ${pv_list[$pv_name]}
 done
 
 # once a PV is not marked for backup anymore (label value changed, PV deleted...),
 # mark any snapshot for that PV for deletion.
 for restic_snapshot_host in $restic_snapshot_hostname_list; do
-  # echo $restic_snapshot_host
-  # echo restic_snapshot ${pv_list[$restic_snapshot_host]}
   if [[ ! ${pv_list[$restic_snapshot_host]} ]]; then
-    # tag all the snapshots owned by the deleted PV to forget them during next run
     echo "PV $restic_snapshot_host is not marked for backup anymore, setting backups to-delete"
     restic tag --set to-delete --host "$restic_snapshot_host"
   fi
