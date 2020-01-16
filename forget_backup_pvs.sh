@@ -30,18 +30,18 @@ declare -A pv_list
 set +m
 shopt -s lastpipe
 oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -r '.items[].metadata.name' | while IFS= read -r pv_name; do
-  echo "$pv_name"
   pv_list["$pv_name"]="0"
-  echo ${pv_list[$pv_name]}
+  #echo ${pv_list[$pv_name]}
 done
 
 # once a PV is not marked for backup anymore (label value changed, PV deleted...),
 # mark any snapshot for that PV for deletion.
 for restic_snapshot_host in $restic_snapshot_hostname_list; do
-  echo $restic_snapshot_host
-  echo restic_snapshot ${pv_list[$restic_snapshot_host]}
+  # echo $restic_snapshot_host
+  # echo restic_snapshot ${pv_list[$restic_snapshot_host]}
   if [[ ! ${pv_list[$restic_snapshot_host]} ]]; then
     # tag all the snapshots owned by the deleted PV to forget them during next run
+    echo "PV $restic_snapshot_host is not marked for backup anymore, setting backups to-delete"
     restic tag --set to-delete --host "$restic_snapshot_host"
   fi
 done
