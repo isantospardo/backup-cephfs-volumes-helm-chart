@@ -20,4 +20,4 @@ fi
 # Both forget and prune need the exclusive lock on the whole restic repo in S3 (cannot run concurrently with backups)
 # so we do both operations together
 echo "Forgetting backups..."
-restic forget --cache-dir=/cache ${restic_forget_args}
+restic forget ${restic_forget_args}

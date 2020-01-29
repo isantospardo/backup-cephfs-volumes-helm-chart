@@ -38,7 +38,7 @@ while true; do
       mount -t ceph "$CEPHFS_MONITORS_PV":"$CEPHFS_ROOTPATH_PV"  -o name="$CEPHFS_USERID",noatime,secret="$CEPHFS_USERKEY" /mnt
 
       echo "backing up PV $PV_NAME JOB_UID: $JOB_UID ..."
-      if ! restic backup /mnt --host="$PV_NAME" --cache-dir=/cache --tag=cronjob --tag="$PV_NAME"; then
+      if ! restic backup /mnt --host="$PV_NAME" --tag=cronjob --tag="$PV_NAME"; then
         echo "ERROR backing up pv $PV_NAME by $(hostname)"
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-at="$(timestamp)" --overwrite=true
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-by="$(hostname)" --overwrite=true
