@@ -30,6 +30,12 @@ while true; do
       CEPHFS_USERID=$(oc get secret $CEPHFS_SECRET_REF -n $NAMESPACE_CSI_DRIVER -o json | jq -r '.data.userID' | base64 -d )
       CEPHFS_USERKEY=$(oc get secret $CEPHFS_SECRET_REF -n $NAMESPACE_CSI_DRIVER -o json | jq -r '.data.userKey' | base64 -d )
 
+      # We need to export RESTIC_REPOSITORY to a new path as we now backup each of the PVs
+      # separately into a different folder per PV (See https://its.cern.ch/jira/browse/CIPAAS-605)
+      RESTIC_REPOSITORY="${RESTIC_REPO_BASE}/${PV_NAME}"
+      # In case there is a new PV to backup, there won't be any folder with its name, so we need to create it
+      restic list locks || restic -r $RESTIC_REPOSITORY init
+
       # It makes sure when the backup started and by which pod
       oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-started-at="$(timestamp)" --overwrite=true
       oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-started-by="$(hostname)" --overwrite=true
