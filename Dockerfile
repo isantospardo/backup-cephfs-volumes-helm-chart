@@ -1,6 +1,6 @@
 FROM gitlab-registry.cern.ch/paas-tools/openshift-client
 
-ARG restic_version=0.9.5
+ARG restic_version=0.9.6
 
 COPY ./enqueue_pvs.sh ./backup_pvs.sh ./forget_backup_pvs.sh /
 
