@@ -42,21 +42,22 @@ while true; do
         echo "ERROR backing up pv $PV_NAME by $(hostname)"
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-at="$(timestamp)" --overwrite=true
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-failure-by="$(hostname)" --overwrite=true
-      fi
+      else
 
-      echo "$PV_NAME" backed up
+        echo "$PV_NAME" backed up
 
-      # It annotates the success of the backup into the PV
-      echo annotating and labeling PV "$NAME_PV" JOB_UID: "$JOB_UID" ...
-      oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-at="$(timestamp)" --overwrite=true
-      oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-by="$(hostname)" --overwrite=true
+        # It annotates the success of the backup into the PV
+        echo annotating and labeling PV "$NAME_PV" JOB_UID: "$JOB_UID" ...
+        oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-at="$(timestamp)" --overwrite=true
+        oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-by="$(hostname)" --overwrite=true
 
-      # Push metrics into the prometheus group identified by cephfs_volume_last_backup{job="cephfs_backup_pv", persistentvolume="pv_name", status="backup_succeeded"} date +%s
-      cat <<EOF | curl --data-binary @- ${pushgateway_service}/metrics/job/"cephfs_backup_pv"/persistentvolume/"$PV_NAME"/status/"backup_succeeded"
-          # TYPE cephfs_volume_last_backup gauge
-          # HELP cephfs_volume_last_backup job="cephfs_backup_pv" persistentvolume="pv_name" status="backup_succeeded"
-          cephfs_volume_last_backup $(date '+%s.%N' | sed 's/N$//')
+        # Push metrics into the prometheus group identified by cephfs_volume_last_backup{job="cephfs_backup_pv", persistentvolume="pv_name", status="backup_succeeded"} date +%s
+        cat <<EOF | curl --data-binary @- ${pushgateway_service}/metrics/job/"cephfs_backup_pv"/persistentvolume/"$PV_NAME"/status/"backup_succeeded"
+            # TYPE cephfs_volume_last_backup gauge
+            # HELP cephfs_volume_last_backup job="cephfs_backup_pv" persistentvolume="pv_name" status="backup_succeeded"
+            cephfs_volume_last_backup $(date '+%s.%N' | sed 's/N$//')
 EOF
+      fi
       # Unmount pv from /mnt earlier mounted
       echo unmounting "$PV_NAME" from /mnt JOB_UID: "$JOB_UID"  ...
       umount /mnt
