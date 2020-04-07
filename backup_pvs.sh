@@ -33,7 +33,7 @@ while true; do
       # We need to export RESTIC_REPOSITORY to a new path as we now backup each of the PVs
       # separately into a different folder per PV (See https://its.cern.ch/jira/browse/CIPAAS-605)
       export RESTIC_REPOSITORY="${RESTIC_REPO_BASE}/${PV_NAME}"
-      # In case there is a new PV to backup, there won't be any folder with its name, so we need to create it
+      # In case there is a new PV to backup, there won't be any restic repo for it yet, so we need to create it with `restic init`
       restic list locks || restic init
 
       # It makes sure when the backup started and by which pod
