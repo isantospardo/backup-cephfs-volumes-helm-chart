@@ -8,14 +8,14 @@ timestamp() {
 JOB_UID=$(cat /etc/jobinfo/labels | grep 'job-name' | cut -d'=' -f2 |  tr -d '"')
 
 # Only one pod will be the first to set the init key and get a return value of 1
-setnx_rv=$(redis-cli --raw -h redis SETNX job-$JOB_UID-init "$(hostname)")
+setnx_rv=$(redis-cli --raw -h redis SETNX job-$JOB_UID-$REDIS_QUEUE_INIT_NAME "$(hostname)")
 
 if [ $setnx_rv -eq 1 ]; then
     # I'm the first, initialize the queue and set the init-complete key
 
     oc get pv -l backup-cephfs-volumes.cern.ch/backup=true -o json | jq -c '.items | .[]' | while IFS= read -r PV_JSON; do
         # Enqueue the json of the PV in redis queue, it uses the uid of the job, so each of the queues will a different repo.
-        redis-cli -h redis rpush job-$JOB_UID-queue "$PV_JSON"
+        redis-cli -h redis rpush job-$JOB_UID-$REDIS_QUEUE_INIT_NAME-queue "$PV_JSON"
 
         PV_NAME=$(echo "$PV_JSON" | jq -r '.metadata.name')
 
@@ -27,10 +27,10 @@ if [ $setnx_rv -eq 1 ]; then
     done
     
     # notify other pods that initialization is complete and we filled the queue with all PVs to back up
-    redis-cli --raw -h redis SETNX job-$JOB_UID-init-complete "$(hostname)"
+    redis-cli --raw -h redis SETNX job-$JOB_UID-$REDIS_QUEUE_INIT_NAME-complete "$(hostname)"
 else
     # Not the first pod, wait for the first pod to fill the queue and set init-complete key
-    while [ -z "$(redis-cli --raw -h redis GET job-$JOB_UID-init-complete)" ]; do
+    while [ -z "$(redis-cli --raw -h redis GET job-$JOB_UID-$REDIS_QUEUE_INIT_NAME-complete)" ]; do
         echo "Waiting for first pod to complete initializing the job queue"
         sleep 5s
     done

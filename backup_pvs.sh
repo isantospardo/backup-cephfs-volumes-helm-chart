@@ -12,9 +12,9 @@ set -e
 # It is required to run parallel pods in the job and be able to do simultaneously backups in parallel of different PVs.
 JOB_UID=$(cat /etc/jobinfo/labels | grep 'job-name' | cut -d'=' -f2 |  tr -d '"')
 
-# Iterates over all the items of the repo queue identified by the job id.
+# Iterates over all the items of the repo queue identified by the job id and the init name.
 while true; do
-  ITEM=$(redis-cli -h redis LPOP job-$JOB_UID-queue)
+  ITEM=$(redis-cli -h redis LPOP job-$JOB_UID-$REDIS_QUEUE_INIT_NAME-queue)
   if [ -z "$ITEM" ]; then
     echo "No more PV to process"
     exit 0
