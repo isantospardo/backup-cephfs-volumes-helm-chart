@@ -34,7 +34,7 @@ while true; do
       # separately into a different folder per PV (See https://its.cern.ch/jira/browse/CIPAAS-605)
       export RESTIC_REPOSITORY="${RESTIC_REPO_BASE}/${PV_NAME}"
       # In case there is a new PV to backup, there won't be any folder with its name, so we need to create it
-      restic list locks || restic $RESTIC_REPOSITORY init
+      restic list locks || restic init
 
       # It makes sure when the backup started and by which pod
       oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-started-at="$(timestamp)" --overwrite=true
