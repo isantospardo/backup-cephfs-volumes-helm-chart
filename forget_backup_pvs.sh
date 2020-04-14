@@ -9,7 +9,7 @@ JOB_UID=$(cat /etc/jobinfo/labels | grep 'job-name' | cut -d'=' -f2 |  tr -d '"'
 
 # Iterates over all the items of the repo queue identified by the job id and the init name.
 while true; do
-  ITEM=$(redis-cli -h redis LPOP job-$JOB_UID-$REDIS_QUEUE_INIT_NAME-queue)
+  ITEM=$(redis-cli -h redis LPOP job-${JOB_UID}-${REDIS_QUEUE_INIT_NAME}-queue)
   if [ -z "$ITEM" ]; then
     echo "No more restic folders to process"
     exit 0
@@ -24,7 +24,7 @@ while true; do
 
   # Run restic check to verify that all data is properly stored in the repo.
   if ! restic check; then
-    echo "ERROR when checking restic data, it seems the data is not properly stored in the repository"
+    echo "ERROR when checking restic data, it seems the PV ${PV_NAME} data is not properly stored in the repository"
     exit 1
   fi
 
@@ -35,5 +35,3 @@ while true; do
   restic forget ${restic_forget_args}
 
 done
-
-echo "No more restic folders to process"
