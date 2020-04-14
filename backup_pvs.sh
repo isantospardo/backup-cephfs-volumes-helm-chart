@@ -53,7 +53,7 @@ while true; do
         echo "$PV_NAME" backed up
 
         # It annotates the success of the backup into the PV
-        echo annotating and labeling PV "$NAME_PV" JOB_UID: "$JOB_UID" ...
+        echo annotating and labeling PV "$PV_NAME" JOB_UID: "$JOB_UID" ...
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-at="$(timestamp)" --overwrite=true
         oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-success-by="$(hostname)" --overwrite=true
 
