@@ -11,4 +11,6 @@ RUN yum install epel-release -y && \
     yum install yum-plugin-copr -y && \
     yum copr enable copart/restic -y && \
     yum install restic-${restic_version} -y && \
+    # install s3cmd for backup recovery
+    yum install s3cmd -y && \
     yum clean all
