@@ -32,10 +32,14 @@ while true; do
   # Run restic check to verify that all data is properly stored in the repo.
   if ! restic check; then
     echo "ERROR when checking restic data, it seems the PV ${PV_NAME} data is not properly stored in the repository"
-    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/forget-backup-failure-at="$(timestamp)" --overwrite=true
-    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/forget-backup-failure-by="$(hostname)" --overwrite=true
-    exit 1
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-check-failure-at="$(timestamp)" --overwrite=true
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-check-failure-by="$(hostname)" --overwrite=true
+EOF
+    continue
   else
+    # remove annotations of failed restic check when fixed
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-check-failure-at-
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-check-failure-by-
 
     # forget and prune old backups
     # Both forget and prune need the exclusive lock on the whole restic repo in S3 (cannot run concurrently with backups)
@@ -45,14 +49,14 @@ while true; do
 
     # It annotates the success of the forget backup into the PV
     echo annotating and labeling PV "$PV_NAME" JOB_UID: "$JOB_UID" ...
-    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/forget-backup-success-at="$(timestamp)" --overwrite=true
-    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/forget-backup-success-by="$(hostname)" --overwrite=true
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-forget-success-at="$(timestamp)" --overwrite=true
+    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-forget-success-by="$(hostname)" --overwrite=true
 
-    # Push metrics into the prometheus group identified by cephfs_volume_last_forget_backup{job="cephfs_forget_backup_pv", persistentvolume="pv_name", status="forget_backup_succeeded"} date +%s
-    cat <<EOF | curl --data-binary @- ${pushgateway_service}/metrics/job/"cephfs_forget_backup_pv"/persistentvolume/"$PV_NAME"/status/"forget_backup_succeeded"
-        # TYPE cephfs_volume_last_forget_backup gauge
-        # HELP cephfs_volume_last_forget_backup job="cephfs_forget_backup_pv" persistentvolume="pv_name" status="forget_backup_succeeded"
-        cephfs_volume_last_forget_backup $(date '+%s.%N' | sed 's/N$//')
+    # Push metrics into the prometheus group identified by cephfs_volume_last_backup_forget{job="cephfs_forget_backup_pv", persistentvolume="pv_name", status="backup_forget_succeeded"} date +%s
+    cat <<EOF | curl --data-binary @- ${pushgateway_service}/metrics/job/"cephfs_forget_backup_pv"/persistentvolume/"$PV_NAME"/status/"backup_forget_succeeded"
+        # TYPE cephfs_volume_last_backup_forget gauge
+        # HELP cephfs_volume_last_backup_forget job="cephfs_forget_backup_pv" persistentvolume="pv_name" status="backup_forget_succeeded"
+        cephfs_volume_last_backup_forget $(date '+%s.%N' | sed 's/N$//')
 EOF
   fi
 done
