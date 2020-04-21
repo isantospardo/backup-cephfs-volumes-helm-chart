@@ -34,12 +34,14 @@ while true; do
     echo "ERROR when checking restic data, it seems the PV ${PV_NAME} data is not properly stored in the repository"
     oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-check-failure-at="$(timestamp)" --overwrite=true
     oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-check-failure-by="$(hostname)" --overwrite=true
-EOF
     continue
   else
-    # remove annotations of failed restic check when fixed
-    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-check-failure-at-
-    oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-check-failure-by-
+    # Push metrics into the prometheus group identified by cephfs_volume_last_backup_check{job="cephfs_forget_backup_pv", persistentvolume="pv_name", status="backup_check_succeeded"} date +%s
+    cat <<EOF | curl --data-binary @- ${pushgateway_service}/metrics/job/"cephfs_forget_backup_pv"/persistentvolume/"$PV_NAME"/status/"backup_check_succeeded"
+        # TYPE cephfs_volume_last_backup_check gauge
+        # HELP cephfs_volume_last_backup_check job="cephfs_forget_backup_pv" persistentvolume="pv_name" status="backup_check_succeeded"
+        cephfs_volume_last_backup_check $(date '+%s.%N' | sed 's/N$//')
+EOF
 
     # forget and prune old backups
     # Both forget and prune need the exclusive lock on the whole restic repo in S3 (cannot run concurrently with backups)
