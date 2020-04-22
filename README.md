@@ -4,7 +4,7 @@ We need to backup CephFS persistent volumes. By default we do not have any autom
 
 This [backup solution](https://gitlab.cern.ch/paas-tools/storage/backup-cephfs-volumes) backs up the CephFS persistent volumes.
 A combination of [StorageClass annotations](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment/blob/master/chart/templates/cephfs-storageclass.yaml)
-and 
+and
 [OPA rules](https://gitlab.cern.ch/paas-tools/infrastructure/openpolicyagent/merge_requests/4) sets
 the label `backup-cephfs-volumes.cern.ch/backup=true` on PVs to be backed up.
 When the backup job starts, it creates several pods based on the job's `.spec.parallelism`. Their first operation is to add a `json` document describing each PV to be backed up
@@ -48,3 +48,17 @@ Once we build the images, we have two scenarios:
 2. We want to deploy a new stable image in our three clusters `Prod`, `Staging` and `Playground`:
    We need to go to [CephFS csi deployment](https://gitlab.cern.ch/paas-tools/infrastructure/cephfs-csi-deployment),
    and open a new MR against master with the new `RELEASE` tag automatically created by the `.gitlab-ci`
+
+## Troubleshooting
+
+-- `Restic already locked`: In April 2020, we discovered that the CephFS backup queue was locked for several days without noticing.
+This happened because a job run out of memory and it crashed, living the queue locked with the following error:
+```
+Fatal: unable to create lock in backend: repository is already locked exclusively by PID 27 on forget-backup-volumes-cephfs-1585371600-9khr6 by  (UID 0, GID 0)
+lock was created at 2020-03-28 06:00:08 (135h29m2.484952586s ago)
+```
+To fix this and unlock the queue, we can do the following:
+```
+last_job=$(oc get job -n paas-infra-cephfs -l app=restic-backup -o name | tail -n 1)
+oc debug -n paas-infra-cephfs $last_job -- restic unlock
+```
