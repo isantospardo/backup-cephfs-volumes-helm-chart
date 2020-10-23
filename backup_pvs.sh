@@ -4,6 +4,19 @@ timestamp() {
   date +%Y-%m-%dT%H:%M:%S.%3NZ
 }
 
+# We need to initialize OpenStack credentials to be able to talk with the manila API
+initOpenStackCredentials(){
+    export OS_AUTH_URL=https://keystone.cern.ch/v3
+    export OS_IDENTITY_API_VERSION=3
+    export OS_USER_DOMAIN_ID=default
+    export OS_APPLICATION_CREDENTIAL_NAME=${OS_USER_NAME}
+    export OS_PROJECT_DOMAIN_ID=default
+    export OS_APPLICATION_CREDENTIAL_ID=${OS_CREDENTIAL_ID}
+    export OS_APPLICATION_CREDENTIAL_SECRET=${OS_CREDENTIAL_SECRET}
+    export OS_REGION_NAME=cern
+    export OS_AUTH_TYPE=v3applicationcredential
+}
+
 # Will stop the execution of the backup script if it finds any command execution error
 # as all the operations are critical.
 set -e
@@ -11,6 +24,16 @@ set -e
 # Get job name uid through the downward API. This value is store in the labels of the pod just created by the job.
 # It is required to run parallel pods in the job and be able to do simultaneously backups in parallel of different PVs.
 JOB_UID=$(cat /etc/jobinfo/labels | grep 'job-name' | cut -d'=' -f2 |  tr -d '"')
+
+
+# Contact the OpenStack manila API to retrieve information about each of the manila shares
+# We need this to be able to mount PVs for backup
+# See https://clouddocs.web.cern.ch/file_shares/programmatic_access.html
+initOpenStackCredentials
+MANILA_URL=$(openstack catalog show manilav2 | grep public | awk '{print $4}')
+
+# OpenStack token issues will expire after 24h, so we can create several tokens per day
+OPENSTACK_MANILA_SECRET=$(openstack token issue | grep "| id" | awk '{print $4}')
 
 # Iterates over all the items of the repo queue identified by the job id and the init name.
 while true; do
@@ -24,11 +47,18 @@ while true; do
       PV_NAME=$(echo "$ITEM" | jq -r '.metadata.name')
 
       NAMESPACE_CSI_DRIVER=$(echo $ITEM | jq -r '.spec.csi.nodeStageSecretRef.namespace')
-      CEPHFS_MONITORS_PV=$(echo $ITEM | jq -r '.spec.csi.volumeAttributes.monitors')
-      CEPHFS_ROOTPATH_PV=$(echo $ITEM | jq -r '.spec.csi.volumeAttributes.rootPath')
-      CEPHFS_SECRET_REF=$(echo $ITEM | jq -r '.spec.csi.nodeStageSecretRef.name')
-      CEPHFS_USERID=$(oc get secret $CEPHFS_SECRET_REF -n $NAMESPACE_CSI_DRIVER -o json | jq -r '.data.userID' | base64 -d )
-      CEPHFS_USERKEY=$(oc get secret $CEPHFS_SECRET_REF -n $NAMESPACE_CSI_DRIVER -o json | jq -r '.data.userKey' | base64 -d )
+      # We need this information to access the manila API
+      MANILA_SHARE_ID=$(echo $ITEM | jq -r '.spec.csi.volumeAttributes.shareID')
+      MANILA_SHARE_ACCESS_ID=$(echo $ITEM | jq -r '.spec.csi.volumeAttributes.shareAccessID')
+      MANILA_EXPORT_LOCATIONS=$(curl -X GET -H "X-Auth-Token: $OPENSTACK_MANILA_SECRET" -H "X-Openstack-Manila-Api-Version: 2.45" $MANILA_URL/shares/$MANILA_SHARE_ID/export_locations)
+
+      # Stores monitors and path of the PV, similar to
+      # 137.138.121.135:6789,188.184.85.133:6789,188.184.91.157:6789:/volumes/_nogroup/337f5361-bee2-415b-af8e-53eaec1add43
+      CEPHFS_PATH_PV=$(echo $MANILA_EXPORT_LOCATIONS | jq -r '.export_locations[]?.path')
+
+      # Stores the userKey credentials needed to manually mount CephFS PVs
+      MANILA_ACCESS_RULES=$(curl -X GET -H "X-Auth-Token: $OPENSTACK_MANILA_SECRET" -H "X-Openstack-Manila-Api-Version: 2.45" $MANILA_URL/share-access-rules/$MANILA_SHARE_ACCESS_ID)
+      CEPHFS_USERKEY=$(echo $MANILA_ACCESS_RULES | jq -r '.access.access_key')
 
       # We need to export RESTIC_REPOSITORY to a new path as we now backup each of the PVs
       # separately into a different folder per PV (See https://its.cern.ch/jira/browse/CIPAAS-605)
@@ -41,7 +71,7 @@ while true; do
       oc annotate pv/"$PV_NAME" backup-cephfs-volumes.cern.ch/backup-started-by="$(hostname)" --overwrite=true
 
       echo mounting "$PV_NAME" in /mnt JOB_UID: "$JOB_UID" ...
-      mount -t ceph "$CEPHFS_MONITORS_PV":"$CEPHFS_ROOTPATH_PV"  -o name="$CEPHFS_USERID",noatime,secret="$CEPHFS_USERKEY" /mnt
+      mount -t ceph "$CEPHFS_PATH_PV" -o name="$PV_NAME",noatime,secret="$CEPHFS_USERKEY" /mnt
 
       echo "backing up PV $PV_NAME JOB_UID: $JOB_UID ..."
       if ! restic backup /mnt --host="$PV_NAME" --tag=cronjob --tag="$PV_NAME"; then
