@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.backupMetrics.serviceName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pushgateway
+  template:
+    metadata:
+      name: pushgateway
+      labels:
+        app: pushgateway
+        visualize: "true"
+        run: pushgateway
+      annotations:
+        # enable scraper by the prometheus instance
+        prometheus.io/scrape: 'true'
+    spec:
+      containers:
+      - name: {{ .Values.backupMetrics.serviceName }}
+        image: {{ .Values.backupMetrics.image }}
+        ports:
+        - name: web
+          containerPort: 9091
+        resources:
+          limits:
+            cpu: 200m
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 30Mi
+        livenessProbe:
+          httpGet:
+            path: /#/status
+            port: 9091
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /#/status
+            port: 9091
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: pushgateway
+    visualize: "true"
+    app: pushgateway
+  name: {{ .Values.backupMetrics.serviceName }}
+spec:
+  selector:
+    app: pushgateway
+  type: ClusterIP
+  ports:
+  - name: scrape
+    protocol: TCP
+    port: 9091

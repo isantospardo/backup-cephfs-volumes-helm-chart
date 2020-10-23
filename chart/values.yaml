@@ -1,0 +1,49 @@
+backup:
+  schedule: "0 20 * * *"
+  serviceAccountName: cephfs-backup-job
+  parallelism: 4
+
+backupMetrics:
+  image: prom/pushgateway
+  serviceName: cephfs-backup-pushgateway
+
+# node selector for backup jobs.
+nodeSelector:
+  node-role.kubernetes.io/infra: ""
+
+# We back up to S3 all the CephFS persistentVolumes with a backup flag.
+# We need different S3 credentials for environment to separate the S3 buckets.
+# See https://gitlab.cern.ch/paas-tools/okd4-install/-/blob/master/docs/components/cephfs-csi/README.md
+# For more information.
+s3:
+  cephfsBackupS3AccessKey: "VALUE_SET_IN_CI_VARIABLES"
+  cephfsBackupS3SecretKey: "VALUE_SET_IN_CI_VARIABLES"
+  cephfsBackupPassword: "VALUE_SET_IN_CI_VARIABLES"
+  cephfsBackupRepositoryBase: "VALUE_SET_IN_CI_VARIABLES"
+
+backupCronjob:
+  # Value set in https://gitlab.cern.ch/paas-tools/okd4-install/-/blob/master/chart/charts/cephfs-csi/values.yaml
+  image: "VALUE_SET_IN_ARGOCD_DEPLOYMENT"
+  # init name to initialize redis queue and distinguish from others
+  redisQueueInitName: "backup-init"
+
+openstack:
+  manilaSecretName: ""
+
+backupForget:
+  # Forget options from https://restic.readthedocs.io/en/latest/060_forget.html
+  # restic backups are only for disaster recovery. We don't need to keep many of them,
+  # we'll use snapshots instead for point-in-time restores.
+  resticForgetArgs: --keep-yearly 3 --keep-monthly 3 --keep-weekly 4 --keep-daily 7 --prune
+  serviceAccountName: cephfs-backup-job
+  # if backups did not complete when pruning starts, it will fail to acquire the lock.
+  # So don't hesitate and retry a number of times in hope that the lock will be released eventually.
+  # Kubernetes will have increasing backoff and eventually retry every 6 min.
+  # The schedule needs to be in a different time window than the backup schedule.
+  # We need this because we back up all PVs to a single restic repo, and restic forget
+  # needs exclusive lock on that repo.
+  retries: 40
+  schedule: "0 5 * * SAT"
+  # init name to initialize redis queue and distinguish from others
+  redisQueueInitName: "forget-backup-init"
+  parallelism: 4

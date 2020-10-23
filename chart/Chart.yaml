@@ -1,0 +1,16 @@
+apiVersion: v2
+name: cephfs-backup-pvs
+version: 0.1.0
+description: A Helm chart to backup persistent volumes
+appVersion: v0.1.0
+keywords:
+- openshift
+- csi
+- backup
+- S3
+- manila
+sources:
+- https://gitlab.cern.ch/paas-tools/okd4-deployment/backup-cephfs-volumes
+maintainers:
+- name: CERN IT-CDA-WF
+  email: openshift-admins@cern.ch
